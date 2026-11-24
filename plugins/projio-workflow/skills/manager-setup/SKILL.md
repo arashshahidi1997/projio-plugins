@@ -91,11 +91,16 @@ every `{{…}}` placeholder; a placeholder with nothing to say becomes a short
 
 5. **Gitignore the board and install the core.**
    - Add the board's folder (`.scratch/`) to `.gitignore` unless
-     `git check-ignore -q <board>` already passes. In projio, outside the
-     `# >>> projio >>>` block (sync rewrites that block).
+     `git check-ignore -q <board>` already passes. In projio, `projio sync`
+     puts `/.scratch/` in the `# >>> projio >>>` block; never edit that block
+     by hand (sync rewrites it). `.scratch/` is the recommended home for all
+     scratch (drafts, reports, viewable outputs), since the Claude app's file
+     pane opens only files inside the project; it is never required.
    - projio layout with `projio` on PATH: `projio sync` (copies the core,
      this skill and the adapter into `.claude/skills/`). It also copies other
      skills; tell the user if other sessions have uncommitted skills.
+   - Installed as a plugin (the core and this skill from one marketplace):
+     nothing to copy; the plugin's skill folders are used as they are.
    - Otherwise: copy the core's folder next to this one,
      `cp -r <this skill's folder>/../project-manager .claude/skills/` (and
      this skill's folder, so the project can redo the setup). The helpers are
@@ -111,7 +116,9 @@ every `{{…}}` placeholder; a placeholder with nothing to say becomes a short
    standing manager's title carries no code), then: turn this session's
    Remote Control on if it is off (`set_remote_control(session_id="self",
    enabled=true)`; the app may show an approval card) and say so in one line,
-   unless the user said otherwise; read the first manager handoff (step 7) by
+   unless the user said otherwise; file itself in the sidebar section
+   `managers` where the client has one (the core's Start) and say so in one
+   line; read the first manager handoff (step 7) by
    path (or `note_resolve` in projio), load the `<prefix>manager` skill, run a
    round, stay open as observer and dispatcher, the push rule. Write Delegate's **Recommended now** block
    (`MGR`: start the standing manager) and fill What's up and Sync (this
@@ -131,7 +138,9 @@ every `{{…}}` placeholder; a placeholder with nothing to say becomes a short
    No push unless the user's push rule says so.
 
 9. **Report**: the board path (open it with `show_pane`), the kickoff code to
-   start, and anything left for the user.
+   start, and anything left for the user. Where the client has
+   `start_session`, offer to start the `MGR` kickoff on the user's go (the
+   core's Levels, Dispatcher); otherwise the user pastes it.
 
 ## Packaging (for projects without projio)
 
@@ -142,6 +151,14 @@ repo with `.claude-plugin/plugin.json` and the two folders under `skills/`
 works; the helpers are then run from the plugin's folder, the base directory
 Claude Code shows when the skill loads.
 
+**Updates.** However the core was installed, a new manager gets updates the
+same way as every other: the manager of the project that owns the core
+announces each release by message, and this project's manager applies it,
+reloads and confirms (the core's Core updates). Put the owning project's
+manager in the board's Sync so its messages are recognized; a plugin install
+is the simplest to keep current (`claude plugin update <plugin>@<marketplace>`,
+once per machine).
+
 ## Hard rules
 
 - Survey read-only; write only the files in steps 3-8.
@@ -150,6 +167,11 @@ Claude Code shows when the skill loads.
   to the core.
 - Every kickoff's first line is ``Title this session `<…>`.``; a work
   session's title carries the kickoff code, `<prefix><unit> · <CODE> · <item>`.
+- The standing manager starts a kickoff's session itself only on the user's
+  go and where the client has `start_session` (nested under it, as the
+  core's Levels, Dispatcher says); otherwise the user pastes the kickoff.
+- The standing manager files itself in the sidebar section `managers` where
+  the client has one.
 - The standing manager keeps Remote Control on and messages other machines
   by exact session name (the core's Messaging); a `[from <project>]` note
   only when an end has Remote Control off or the send fails.

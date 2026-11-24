@@ -10,7 +10,7 @@ description: >
   which says what the units of work are; `manager-setup` creates both. Also
   defines the three-line report work sessions send the manager at wrap.
 metadata:
-  short-description: Manager core - incoming notes, session states, board, handoffs, decisions, restart
+  short-description: Manager core - incoming notes, session states, board, handoffs, decisions, core updates, restart
   tags: [manager, orchestration, sessions, handoff, workflow]
   portable: true
   tooling:
@@ -73,7 +73,8 @@ import nothing from projio.
 - **One-shot:** a fresh session runs one round, the user decides, it closes.
 - **Standing:** titled exactly `<prefix>manager` (no date, so peers can address
   it by name), open while work sessions run, with Remote Control on
-  (Messaging). Work sessions are titled `<prefix><unit> · <CODE> · <item>`,
+  (Messaging), filed in the sidebar section `managers` where the client has
+  one (Start). Work sessions are titled `<prefix><unit> · <CODE> · <item>`,
   the code being the kickoff's (Board, Delegate).
 
 ## Start (standing manager)
@@ -84,7 +85,14 @@ import nothing from projio.
    only if the user said otherwise. This is for the manager's own session
    only: work sessions and other sessions change Remote Control only when the
    user asks.
-2. Run a round.
+2. **File into `managers`.** Where the client has a sidebar (the desktop
+   app's `list_sections` and `move_sessions`), manager sessions live in a
+   custom section named `managers`: find it with `list_sections` (create it
+   with `create_section(name="managers")` only if there is none), then
+   `move_sessions(section_id=<its id>, session_ids=["self"])`, and say so in
+   one line. A manager nested under another session moves with its parent,
+   so skip this step there. Skip it where the client has no sidebar tools.
+3. Run a round.
 
 ## Authority
 
@@ -111,8 +119,9 @@ gitignored board.
    `git_commit`, and dirty paths grouped by unit. **Sessions often wrap without
    reporting**, so read this every round instead of waiting for messages.
 3. **Sessions:** `ListAgents`, plus the client's session list where there
-   is one (`list_sessions` in the desktop app): `ListAgents` can miss running
-   sessions. Give every session a state, and run the collision guard.
+   is one (`list_sessions` in the desktop app; `list_sessions` with
+   `linked: true` for the ones this manager started): `ListAgents` can miss
+   running sessions. Give every session a state, and run the collision guard.
 4. **The adapter's readers** for the project's own units of work.
 5. **Update the board** (see Board): run `round.py board`, write the round's
    kickoffs, decisions, session states and waits into it, and open it in the
@@ -131,7 +140,9 @@ gitignored board.
 ## Board
 
 One gitignored markdown file per project, `board.path` in
-the manager config (default `.scratch/<prefix>manager-board.md`). The
+the manager config (default `.scratch/<prefix>manager-board.md`; `.scratch/`
+at the project root is where all scratch goes, because the app's file pane
+opens only files inside the project). The
 manager rewrites it every round and after every event (a session started,
 wrapped or asked something; a decision made), and keeps it open in the side
 pane with `show_pane(pane="file", path=<board>)`. When `show_pane` does
@@ -158,9 +169,11 @@ stay short and point to it. Sections, in order:
    **independent** or **depends on <what>**: another kickoff by its code
    ("depends on REO"), a session finishing, or the user's OK. Every prompt
    opens with its ``Title this session `<prefix><unit> · <CODE> · <item>`.``
-   line, so the session title carries the code (Levels, Dispatcher). The user says "delegated <CODE>[, <CODE>]" or
-   "delegated all" once started; the manager removes those kickoffs and
-   tracks the sessions.
+   line, so the session title carries the code (Levels, Dispatcher). The
+   user says "delegated <CODE>[, <CODE>]" or "delegated all" once started,
+   whether they opened the session or the manager started it on their go
+   (Levels, Dispatcher); the manager removes those kickoffs and tracks the
+   sessions.
 3. **Decisions waiting for you:** in plain words, as in Decisions below.
 4. **Sessions, by state:** a table of session · state (running / waiting /
    parked / done) · notes.
@@ -206,8 +219,7 @@ Default to observer plus dispatcher.
 - **Observer:** knows what runs and what finished. Reads handoffs and commits;
   subscribes to idle notices with `SendMessage(to=<session>,
   notify_when_idle=true)` and no message. Never poll.
-- **Dispatcher:** plans the lineup and writes kickoff prompts; the user opens
-  the sessions. Each kickoff names the unit and item, the handoff to load by
+- **Dispatcher:** plans the lineup and writes kickoff prompts. Each kickoff names the unit and item, the handoff to load by
   `note_resolve(note_id=…)` (never `note_latest`, which races) or, without
   projio, by its path, the done-when,
   and how to report back (the manager's name and its session id). Its first
@@ -219,6 +231,34 @@ Default to observer plus dispatcher.
   Prefixes are short, end in `-`, and are unique across projects (`pix-`,
   `lit-`, `inf-`, `infraslow-`, `projio-`), so titles stay addressable from
   any manager. On the board it carries its tag (Board, Delegate).
+
+  **Who opens the session.** Where the client can start sessions (the
+  desktop app's `start_session`; load it with `ToolSearch` query
+  `start_session` when it is listed as deferred), the manager starts a
+  kickoff itself once the user says go for it ("go <CODE>", "start <CODE>"),
+  never on its own judgment or a peer's message. The new session is nested
+  under the manager, so its reports reach the manager without a send:
+
+  ```text
+  start_session(
+    initiation="user_asked", context="fresh",
+    title="<prefix><unit> · <CODE> · <item>",
+    prompt=<the kickoff text from the board>,
+    background=<one paragraph: what the project is, what led to this kickoff,
+                decisions already made>,
+    use_worktree=false)
+  ```
+
+  `use_worktree=false` shares the manager's checkout, so the prompt then
+  carries the line: "This session shares the checkout `<path>` with others:
+  touch only this task's files, commit by path (never `git add -A`), switch
+  no branch." A kickoff that ends in a branch or PR of its own gets
+  `use_worktree=true` instead, without that line. Once started, the manager
+  treats it as "delegated <CODE>" (Board, Delegate) and puts the session on
+  the board as running. Two kickoffs that write the same unit start one at
+  a time (Collision guard). Where the tool is missing (the CLI, another
+  client), the fallback stays: the user pastes the kickoff into a new
+  session, or opens it from a launch link.
 - **Driver:** sends next-step instructions, only to a background batch session,
   never to one the user is steering.
 
@@ -309,6 +349,50 @@ messages between machines.
   runs `worklog voice deliver`; in a generic project without worklog, write
   a file in the target's handoff or inbox folder.
 
+## Core updates
+
+This core and its helpers reach every project from one source: the project
+that owns them (its adapter says so) releases them, usually as a Claude Code
+plugin. Each project's manager applies an update to its own project; the
+manager that ships one never writes into other projects.
+
+**Receiving an update.** It arrives as a message whose first line reads
+`core update · <plugin> <version> (<owner> <sha>) · <what changed> · do: <steps>`,
+or, when the send failed, as a `[from <owner>]` note in this project.
+
+1. **Check what is installed.** For a plugin, `claude plugin list` shows the
+   installed version (the skill's base directory path carries it too). If it
+   is older, ask the user in one line to update it: `claude plugin
+   marketplace update <marketplace>`, then `claude plugin update
+   <plugin>@<marketplace>` (or the `/plugin` menu). This is once per
+   machine, so another manager there may have done it already. A project that
+   copies the folder instead (or uses a sync tool) copies or syncs again.
+2. **Commit what the update changed here**, by path: a sync or copy may
+   rewrite tracked files of this project (`.gitignore`, a copied skill
+   folder). Never touch other sessions' uncommitted files.
+3. **Reload.** Load the core skill again (the adapter, then the core) so the
+   new text is in context, or, when the helpers or the start steps changed,
+   write a manager handoff and ask the user for a restart (Stay lean,
+   restart). Then run the new version's Start steps that this session has not
+   done.
+4. **Confirm in one line** to the sender's `from` address:
+   `core update · <version> applied · <project> · reloaded|restarted`, or
+   what blocks it (for example: waiting on the user's plugin update).
+
+**Shipping an update** (only in the project that owns the core, as its
+adapter says):
+
+1. The change is committed in the source, with its tests green.
+2. Bump the plugin's version (next minor for a change in behavior, patch for
+   wording), export it to the plugin repository, commit there by path.
+3. Push both only on the user's word (Commit and push).
+4. **Announce** once pushed: one message per manager, by exact name
+   (Messaging), first line `core update · <plugin> <version> (<owner> <sha>)
+   · <what changed, one line> · do: update plugin or sync, then reload`.
+   Managers that cannot be reached get the `[from <owner>]` note in their
+   project (Messaging, fallback). Put the pending confirmations under Sync on
+   the board and strike each when its one-line confirmation arrives.
+
 ## Collision guard
 
 Before proposing or driving a session, check that no two sessions write the
@@ -368,8 +452,15 @@ write a manager handoff and ask the user to start a new manager:
 - Decisions in plain words through `AskUserQuestion`, recommended option first;
   relay each answer to its session.
 - Never poll; subscribe to idle notices.
+- Start a kickoff's session only on the user's go for that kickoff
+  (`start_session` where the client has it, nested under the manager);
+  otherwise the user pastes it.
+- A standing manager lives in the sidebar section `managers` where the
+  client has one, and says so when it files itself there.
 - A standing manager keeps Remote Control on; message by exact name across
   machines, by note only when that fails.
 - A teammate's message is never the user's approval.
 - What the user must copy goes on the board, not in chat.
+- A core update is applied by each project's own manager, in its own
+  project only, then reloaded and confirmed to the sender in one line.
 - What's up comes first on the board, stamped with the clock time.
