@@ -9,7 +9,7 @@ Install in Claude Code:
 /plugin install projio-workflow@projio
 ```
 
-- `projio-workflow` 0.4.0: A standing manager session for any git project (incoming notes, session states, board, handoffs), its setup, a session wrap that commits by path and writes a handoff, the 'always complete, never finished' check, and analysis threads (where a thread stands and what to work on next; result notes and the thread's state doc). Needs git and Python 3.9+, not projio.
+- `projio-workflow` 0.5.0: A standing manager session for any git project (incoming notes, session states, board, handoffs), its setup, a session wrap that commits by path and writes a handoff, the 'always complete, never finished' check, and analysis threads (where a thread stands and what to work on next; result notes and the thread's state doc). Needs git and Python 3.9+, not projio.
 
 Updates: `/plugin marketplace update projio`, then update the plugin from the `/plugin` menu.
 
